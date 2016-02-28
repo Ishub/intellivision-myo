@@ -8,6 +8,6 @@ class Credentials {
   // Also, if you're committing your code to a public repo, be careful not to check in your
   // credentials -- we're including these here so you can get started out of the box, but this is
   // generally a bad practice.
-  static final String CLIENT_ID = "QwyVMelyYYyB57bUcmAj5pNJ8DFbF2vX_otHSwP1";
-  static final String CLIENT_SECRET = "uTvXRCBEaenYGwAbae56BIcxavMduS6TtJHMnYCZ";
+  static final String CLIENT_ID = "6J3en3fBc6nDWHx1M0skJ4bVG-Z-itHjzA4F08Jl";
+  static final String CLIENT_SECRET = "OF5c4cLlxNWi2aJDbnZZlLvaU8Aes1VMm63afJSI";
 }

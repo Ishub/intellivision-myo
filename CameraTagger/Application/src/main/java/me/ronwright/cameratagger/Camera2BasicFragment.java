@@ -24,6 +24,7 @@ import android.app.DialogFragment;
 import android.app.Fragment;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -70,6 +71,13 @@ import com.clarifai.api.RecognitionRequest;
 import com.clarifai.api.RecognitionResult;
 import com.clarifai.api.Tag;
 import com.clarifai.api.exception.ClarifaiException;
+import com.firebase.client.AuthData;
+import com.firebase.client.DataSnapshot;
+import com.firebase.client.Firebase;
+import com.firebase.client.FirebaseError;
+import com.firebase.client.MutableData;
+import com.firebase.client.Transaction;
+import com.firebase.client.ValueEventListener;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -82,7 +90,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -263,7 +274,8 @@ public class Camera2BasicFragment extends Fragment
 
         @Override
         public void onImageAvailable(ImageReader reader) {
-            mBackgroundHandler.post(new ImageSaver(reader.acquireNextImage(), mTextView, mFile));
+            mBackgroundHandler.post(new ImageSaver(Camera2BasicFragment.this,
+                    reader.acquireNextImage(), mTextView, mFile));
         }
 
     };
@@ -443,6 +455,7 @@ public class Camera2BasicFragment extends Fragment
     public void onViewCreated(final View view, Bundle savedInstanceState) {
         view.findViewById(me.ronwright.cameratagger.R.id.picture).setOnClickListener(this);
         view.findViewById(me.ronwright.cameratagger.R.id.info).setOnClickListener(this);
+        view.findViewById(me.ronwright.cameratagger.R.id.live).setOnClickListener(this);
         mTextureView = (AutoFitTextureView) view.findViewById(me.ronwright.cameratagger.R.id.texture);
         mTextView = (TextView) view.findViewById(me.ronwright.cameratagger.R.id.textView);
     }
@@ -887,11 +900,24 @@ public class Camera2BasicFragment extends Fragment
 
     @Override
     public void onClick(View view) {
+        Timer timer = new Timer();
         switch (view.getId()) {
             case me.ronwright.cameratagger.R.id.picture: {
                 takePicture();
                 break;
             }
+            
+            case R.id.live: {
+                for( int z = 0; z < 10; z++) {
+                    timer.scheduleAtFixedRate(new TimerTask() {
+                        @Override
+                        public void run() {
+                            takePicture();
+                        }
+                    }, 0, 1000);
+                }
+            }
+            
             case me.ronwright.cameratagger.R.id.info: {
                 Activity activity = getActivity();
                 if (null != activity) {
@@ -921,6 +947,10 @@ public class Camera2BasicFragment extends Fragment
                 Credentials.CLIENT_SECRET);
 
         /**
+         * The fragment
+         */
+        private final Camera2BasicFragment mFragment;
+        /**
          * The JPEG image
          */
         private final Image mImage;
@@ -933,7 +963,8 @@ public class Camera2BasicFragment extends Fragment
          */
         private final TextView mTextView;
 
-        public ImageSaver(Image image, TextView view, File file) {
+        public ImageSaver(Camera2BasicFragment fragment, Image image, TextView view, File file) {
+            mFragment = fragment;
             mImage = image;
             mTextView = view;
             mFile = file;
@@ -992,6 +1023,30 @@ public class Camera2BasicFragment extends Fragment
             }
         }
 
+        public void incrementCounter(Firebase firebase) {
+            firebase.runTransaction(new Transaction.Handler() {
+                @Override
+                public Transaction.Result doTransaction(final MutableData currentData) {
+                    if (currentData.getValue() == null) {
+                        currentData.setValue(1);
+                    } else {
+                        currentData.setValue((Long) currentData.getValue() + 1);
+                    }
+
+                    return Transaction.success(currentData);
+                }
+
+                @Override
+                public void onComplete(FirebaseError firebaseError, boolean committed, DataSnapshot currentData) {
+                    if (firebaseError != null) {
+                        Log.d(TAG, "Firebase counter increment failed.");
+                    } else {
+                        Log.d(TAG, "Firebase counter increment succeeded.");
+                    }
+                }
+            });
+        }
+
         /** Updates the UI by displaying tags for the given result. */
         private void updateUIForResult(RecognitionResult result) {
             if (result != null) {
@@ -1000,10 +1055,20 @@ public class Camera2BasicFragment extends Fragment
                     StringBuilder b = new StringBuilder();
                     for (Tag tag : result.getTags()) {
                         try {
-                            b.append(b.length() > 0 ? ", " : "").append(
-                                    "<a href=\"http://www.google.com/search?q="
-                                            + URLEncoder.encode(tag.getName(), "utf-8")
-                                            + "\">" + tag.getName() + "</a>");
+                            String encodedTag = URLEncoder.encode(tag.getName(), "utf-8");
+                            Firebase fbRef = new Firebase("http://intense-fire-1654.firebaseio.com/histogram/" + encodedTag);
+                            AuthData authData = fbRef.getAuth();
+                            if (authData != null) {
+                                // Still logged in
+                                incrementCounter(fbRef);
+                                b.append(b.length() > 0 ? ", " : "").append(
+                                        "<a href=\"http://www.google.com/search?q="
+                                                + encodedTag + "\">" + tag.getName() + "</a>");
+                            } else {
+                                // No longer logged in
+                                Intent intent = new Intent(mFragment.getActivity(), LoginActivity.class);
+                                mFragment.startActivity(intent);
+                            }
                         } catch (UnsupportedEncodingException e) {
                             e.printStackTrace();
                         }
