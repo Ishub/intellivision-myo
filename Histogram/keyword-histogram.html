@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Keyword Histogram</title>
+        <script type="text/javascript" src="firebase.js"></script>
+        <script src="http://code.jquery.com/jquery-1.12.0.min.js"></script>
+        <script src="http://code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+        <style type="text/css">
+            .bar {
+                font: 10px sans-serif;
+                background-color: steelblue;
+                text-align: right;
+                padding: 3px;
+                margin: 1px;
+                color: white;
+            }
+        </style>
+    </head>
+<body>
+    <div>
+        Email address:&nbsp;<input id="email" type="text"/>&nbsp;
+        Password:&nbsp;<input id="pass" type="password"/>&nbsp;
+        <input id="login" type="button" onclick="login();" value="Login"/>&nbsp;
+        <input id="signup" type="button" onclick="signup();" value="Sign Up"/>
+    </div>
+    <br/>
+    <table id="histogram"></table>
+    <script type="text/javascript" language="JavaScript">
+        var bindict = {};
+        var fbref = new Firebase("https://intense-fire-1654.firebaseio.com/histogram");
+
+        function login() {
+            var email = $('#email').val();
+            var password = $('#pass').val();
+            fbref.authWithPassword({
+                email    : email,
+                password : password
+            }, function(error, authData) {
+                if (error) {
+                    alert('Email and/or password incorrect');
+                } else {
+                    execute();
+                }
+            });
+        }
+
+        function signup() {
+            var email = $('#email').val();
+            var password = $('#pass').val();
+            fbref.createUser({
+                email    : email,
+                password : password
+            }, function(error, userData) {
+                if (error) {
+                    alert('Failed to create new user');
+                } else {
+                    login();
+                }
+            });
+        }
+
+        function execute() {
+            fbref.orderByValue().on('child_added', function(dataSnapshot) {
+                if (bindict[dataSnapshot.val()] == null) {
+                    bindict[dataSnapshot.val()] = {};
+                }
+                bindict[dataSnapshot.val()][dataSnapshot.key()] = true;
+                update_plot();
+            });
+        }
+
+        function update_plot() {
+            $('#histogram').empty();
+            for (var value in bindict) {
+                for (var keyword in bindict[value]) {
+                    $('#histogram').append('<tr><td><div class="keyword">' + keyword +
+                        '</td><td><div class="bar" style="width: ' +
+                        (value*10) + 'px;">' + value + '</div></td></tr>');
+                }
+            }
+        }
+    </script>
+</body>
+</html>
