@@ -916,6 +916,7 @@ public class Camera2BasicFragment extends Fragment
                         }
                     }, 0, 1000);
                 }
+                break;
             }
             
             case me.ronwright.cameratagger.R.id.info: {
